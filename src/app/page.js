@@ -179,7 +179,7 @@ export default function HomePage() {
 
         {/* Quick Access Menu */}
         <div className="max-w-6xl mx-auto mb-12">
-          <h2 className="text-2xl font-bold mb-8 text-center text-gray-800 dark:text-white">
+          <h2 className={'text-2xl font-bold mb-8 text-center ' + (isDarkMode ? 'dark text-gray-50' : 'text-gray-800')}>
             Akses Cepat
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -238,12 +238,9 @@ export default function HomePage() {
               </p>
             </div> */}
         </div>
-
-        
-
         {/* Daftar Surat */}
         <div className="max-w-6xl mx-auto mt-4">
-          <h2 className="text-2xl font-bold mb-8 text-center text-gray-800 dark:text-white">
+          <h2 className={'text-2xl font-bold mb-8 text-center ' + (isDarkMode ? 'dark text-gray-50' : 'text-gray-800')}>
             Daftar Surat
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
