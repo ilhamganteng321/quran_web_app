@@ -136,8 +136,8 @@ export default function HomePage() {
         {searchResults.length > 0 && (
           <div className="max-w-4xl mx-auto mb-12">
             <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">
-              Hasil Pencarian untuk ${searchQuery}
-            </h2>
+  Hasil Pencarian untuk {searchQuery}
+</h2>
             <div className="space-y-4">
               {searchResults.map((result, index) => (
                 <div
