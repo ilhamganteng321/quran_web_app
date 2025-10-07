@@ -11,6 +11,7 @@ export default function HomePage() {
   const [isSearching, setIsSearching] = useState(false);
   const [suratList, setSuratList] = useState([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Fetch daftar surat saat komponen dimount
@@ -23,14 +24,17 @@ export default function HomePage() {
   }, []);
 
   const fetchAllSurat = async () => {
-    try {
-      const response = await fetch('/api/surat');
-      const data = await response.json();
-      setSuratList(data);
-    } catch (error) {
-      console.error('Error fetching surat:', error);
-    }
-  };
+  try {
+    const response = await fetch('/api/surat');
+    if (!response.ok) throw new Error('Gagal fetch surat');
+    const data = await response.json();
+    setSuratList(data);
+  } catch (error) {
+    console.error('Error fetching surat:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -243,41 +247,48 @@ export default function HomePage() {
           <h2 className={'text-2xl font-bold mb-8 text-center ' + (isDarkMode ? 'dark text-gray-50' : 'text-gray-800')}>
             Daftar Surat
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {suratList.map((surat) => (
-              <Link
-                key={surat.no_surat}
-                href={`/surat/${surat.no_surat}`}
-                className="group bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg hover:shadow-xl transition-all border border-gray-200 dark:border-gray-700 hover:scale-105"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-blue-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">
-                        {surat.no_surat}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-800 dark:text-white">
-                        {surat.nm_surat}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {surat.arti_surat}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-arabic text-gray-800 dark:text-white">
-                      {surat.nm_surat2}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {surat.jml_ayat} ayat • {surat.tmp_turun}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))}
+          {isLoading ? (
+    <div className="flex justify-center items-center py-10">
+      <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+      <span className="ml-3 text-gray-600 dark:text-gray-300">Memuat surat...</span>
+    </div>
+  ) : suratList.length > 0 ? (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {suratList.map((surat) => (
+        <Link key={surat.no_surat} href={`/surat/${surat.no_surat}`} className="group bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg hover:shadow-xl transition-all border border-gray-200 dark:border-gray-700 hover:scale-105">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">
+                  {surat.no_surat}
+                </span>
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-800 dark:text-white">
+                  {surat.nm_surat}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {surat.arti_surat}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-arabic text-gray-800 dark:text-white">
+                {surat.nm_surat2}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {surat.jml_ayat} ayat • {surat.tmp_turun}
+              </p>
+            </div>
           </div>
+        </Link>
+      ))}
+    </div>
+  ) : (
+    <p className="text-center text-gray-600 dark:text-gray-400">
+      Tidak ada surat ditemukan.
+    </p>
+  )}
         </div>
         </div>
       </main>

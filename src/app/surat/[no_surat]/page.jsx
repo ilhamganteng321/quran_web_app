@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Bookmark, BookmarkCheck, Play, Pause, Volume2, Share } from 'lucide-react';
+import { ArrowLeft, Bookmark, BookmarkCheck, Play, Pause, Volume2, Share, ZoomIn, ZoomOut, Type } from 'lucide-react';
 
 export default function SuratDetailPage() {
   const params = useParams();
@@ -17,12 +17,19 @@ export default function SuratDetailPage() {
   const [bookmarks, setBookmarks] = useState([]);
   const [playingAyat, setPlayingAyat] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [fontSize, setFontSize] = useState(3); // 1=small, 2=medium, 3=large, 4=xlarge, 5=xxlarge
 
   useEffect(() => {
     // Check dark mode preference
     const darkMode = localStorage.getItem('darkMode') === 'true';
     setIsDarkMode(darkMode);
     document.documentElement.classList.toggle('dark', darkMode);
+
+    // Load font size preference
+    const savedFontSize = localStorage.getItem('fontSize');
+    if (savedFontSize) {
+      setFontSize(parseInt(savedFontSize));
+    }
 
     // Load bookmarks from localStorage
     const savedBookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
@@ -47,35 +54,206 @@ export default function SuratDetailPage() {
     }
   };
 
-  // Di dalam komponen SuratDetailPage, perbaiki fungsi toggleBookmark:
-const toggleBookmark = (ayat) => {
-  const bookmarkKey = `${suratId}-${ayat.no_ayat}`;
-  const newBookmarks = [...bookmarks];
-  const existingIndex = newBookmarks.findIndex(b => b.key === bookmarkKey);
-  
-  if (existingIndex > -1) {
-    // Remove bookmark
-    newBookmarks.splice(existingIndex, 1);
-  } else {
-    // Add bookmark
-    newBookmarks.push({
-      key: bookmarkKey,
-      no_surat: parseInt(suratId), // Pastikan ini number
-      no_ayat: ayat.no_ayat,
-      nm_surat: suratData.infoSurat.nm_surat,
-      arab: ayat.arab,
-      tafsir: ayat.tafsir,
-      timestamp: new Date().toISOString()
-    });
-  }
-  
-  setBookmarks(newBookmarks);
-  localStorage.setItem('bookmarks', JSON.stringify(newBookmarks));
-};
+  const toggleBookmark = (ayat) => {
+    const bookmarkKey = `${suratId}-${ayat.no_ayat}`;
+    const newBookmarks = [...bookmarks];
+    const existingIndex = newBookmarks.findIndex(b => b.key === bookmarkKey);
+    
+    if (existingIndex > -1) {
+      newBookmarks.splice(existingIndex, 1);
+    } else {
+      newBookmarks.push({
+        key: bookmarkKey,
+        no_surat: parseInt(suratId),
+        no_ayat: ayat.no_ayat,
+        nm_surat: suratData.infoSurat.nm_surat,
+        arab: ayat.arab,
+        tafsir: ayat.tafsir,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    setBookmarks(newBookmarks);
+    localStorage.setItem('bookmarks', JSON.stringify(newBookmarks));
+  };
 
   const isBookmarked = (ayat) => {
     const bookmarkKey = `${suratId}-${ayat.no_ayat}`;
     return bookmarks.some(b => b.key === bookmarkKey);
+  };
+
+  const increaseFontSize = () => {
+    if (fontSize < 5) {
+      const newSize = fontSize + 1;
+      setFontSize(newSize);
+      localStorage.setItem('fontSize', newSize.toString());
+    }
+  };
+
+  const decreaseFontSize = () => {
+    if (fontSize > 1) {
+      const newSize = fontSize - 1;
+      setFontSize(newSize);
+      localStorage.setItem('fontSize', newSize.toString());
+    }
+  };
+
+  const getFontSizeClass = () => {
+    const sizes = {
+      1: 'text-xl',
+      2: 'text-2xl',
+      3: 'text-3xl',
+      4: 'text-4xl',
+      5: 'text-5xl'
+    };
+    return sizes[fontSize] || 'text-3xl';
+  };
+
+  const getTafsirFontSizeClass = () => {
+    const sizes = {
+      1: 'text-sm',
+      2: 'text-base',
+      3: 'text-lg',
+      4: 'text-xl',
+      5: 'text-2xl'
+    };
+    return sizes[fontSize] || 'text-lg';
+  };
+
+  // Function to parse and style tajwid rules and formatting
+  const parseTextWithTajwid = (text) => {
+    if (!text) return null;
+
+    // Parse HTML tags first (for tafsir)
+    const parts = [];
+    let partCounter = 0;
+    const regex = /<(i|b|sup)>([^<]*)<\/(i|b|sup)>|([^<]+)/g;
+    let match;
+    
+    while ((match = regex.exec(text)) !== null) {
+      if (match[1]) {
+        const tag = match[1];
+        const content = match[2];
+        
+        if (tag === 'i') {
+          parts.push(<em key={partCounter++} className="italic">{content}</em>);
+        } else if (tag === 'b') {
+          parts.push(<strong key={partCounter++} className="font-bold">{content}</strong>);
+        } else if (tag === 'sup') {
+          parts.push(<sup key={partCounter++} className="text-xs align-super text-blue-600 dark:text-blue-400">{content}</sup>);
+        }
+      } else if (match[4]) {
+        parts.push(<span key={partCounter++}>{match[4]}</span>);
+      }
+    }
+
+    return parts.length > 0 ? parts : text;
+  };
+
+  // Function to detect and colorize tajwid in Arabic text
+  const parseArabicWithTajwid = (arabicText) => {
+    if (!arabicText) return null;
+
+    const parts = [];
+    let partCounter = 0;
+    
+    // Convert string to array of characters for better processing
+    const chars = Array.from(arabicText);
+    let i = 0;
+    
+    while (i < chars.length) {
+      const char = chars[i];
+      const nextChar = chars[i + 1];
+      const prevChar = chars[i - 1];
+      
+      let className = '';
+      let charToRender = char;
+      
+      // Detect Ghunnah (Tanwin + Shadda with Noon/Meem)
+      // ً ٌ ٍ ّ with ن م
+      if (char === 'ن' || char === 'م') {
+        if (prevChar && (prevChar === 'ّ' || prevChar === 'ً' || prevChar === 'ٌ' || prevChar === 'ٍ')) {
+          className = 'text-pink-600 dark:text-pink-400 font-semibold';
+        }
+      }
+      
+      // Detect Qalqalah letters: ق ط ب ج د
+      if (char === 'ق' || char === 'ط' || char === 'ب' || char === 'ج' || char === 'د') {
+        // Check if it has sukun or at the end
+        if (nextChar === 'ْ' || !nextChar || nextChar === ' ') {
+          className = 'text-green-600 dark:text-green-400 font-semibold';
+        }
+      }
+      
+      // Detect Idgham (Nun Sukun or Tanwin followed by يرملون)
+      if (char === 'ن' && nextChar === 'ْ') {
+        const afterNext = chars[i + 2];
+        if (afterNext && 'يرملون'.includes(afterNext)) {
+          className = 'text-purple-600 dark:text-purple-400 font-semibold';
+        }
+      }
+      
+      // Detect Iqlab (Nun Sukun or Tanwin + Ba)
+      if ((char === 'ن' && nextChar === 'ْ') || ['ً', 'ٌ', 'ٍ'].includes(char)) {
+        const afterNext = chars[i + 2] || chars[i + 1];
+        if (afterNext === 'ب') {
+          className = 'text-orange-600 dark:text-orange-400 font-semibold';
+        }
+      }
+      
+      // Detect Ikhfa (Nun Sukun or Tanwin + specific letters)
+      if ((char === 'ن' && nextChar === 'ْ') || ['ً', 'ٌ', 'ٍ'].includes(char)) {
+        const ikhfaLetters = 'صذثكجشقسدطزفتضظ';
+        const afterNext = chars[i + 2] || chars[i + 1];
+        if (afterNext && ikhfaLetters.includes(afterNext)) {
+          className = 'text-yellow-600 dark:text-yellow-400 font-semibold';
+        }
+      }
+      
+      // Detect Mad (Alif, Waw, Ya with specific marks)
+      // آ or Alif with Madda
+      if (char === 'آ' || (char === 'ا' && (nextChar === 'ٓ' || prevChar === 'َ'))) {
+        className = 'text-red-600 dark:text-red-400 font-semibold';
+      }
+      
+      // Waw Mad (و with Dammah before it)
+      if (char === 'و' && prevChar === 'ُ') {
+        className = 'text-red-600 dark:text-red-400 font-semibold';
+      }
+      
+      // Ya Mad (ي with Kasrah before it)
+      if (char === 'ي' && prevChar === 'ِ') {
+        className = 'text-red-600 dark:text-red-400 font-semibold';
+      }
+      
+      // Detect Lam Syamsiyah/Qamariyah (ال)
+      if (char === 'ل' && prevChar === 'ا') {
+        // Lam Syamsiyah letters: ت ث د ذ ر ز س ش ص ض ط ظ ل ن
+        const syamsiyahLetters = 'تثدذرزسشصضطظلن';
+        if (nextChar && syamsiyahLetters.includes(nextChar)) {
+          className = 'text-blue-600 dark:text-blue-400 font-semibold';
+        }
+      }
+      
+      // Detect Ra Tafkhim/Tarqiq (ر with fathah, dhammah = tafkhim / kasrah = tarqiq)
+      if (char === 'ر') {
+        if (nextChar === 'َ' || nextChar === 'ُ') {
+          className = 'text-indigo-600 dark:text-indigo-400 font-semibold';
+        } else if (nextChar === 'ِ') {
+          className = 'text-cyan-600 dark:text-cyan-400 font-semibold';
+        }
+      }
+      
+      parts.push(
+        <span key={partCounter++} className={className || ''}>
+          {char}
+        </span>
+      );
+      
+      i++;
+    }
+    
+    return parts;
   };
 
   if (loading) {
@@ -133,7 +311,36 @@ const toggleBookmark = (ayat) => {
               </p>
             </div>
             
-            <div className="w-20"></div> {/* Spacer */}
+            {/* Font Size Controls */}
+            <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+              <button
+                onClick={decreaseFontSize}
+                disabled={fontSize === 1}
+                className={`p-2 rounded transition-colors ${
+                  fontSize === 1
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+                title="Perkecil font"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <span className="text-xs text-gray-600 dark:text-gray-400 px-2">
+                <Type className="w-4 h-4" />
+              </span>
+              <button
+                onClick={increaseFontSize}
+                disabled={fontSize === 5}
+                className={`p-2 rounded transition-colors ${
+                  fontSize === 5
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+                title="Perbesar font"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -169,8 +376,8 @@ const toggleBookmark = (ayat) => {
             {/* Bismillah for non-Taubah surat */}
             {infoSurat.no_surat !== 9 && (
               <div className="text-center py-8 border-t border-gray-200 dark:border-gray-600">
-                <p className="text-3xl font-arabic text-gray-800 dark:text-white mb-2">
-                  بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ
+                <p className={`${getFontSizeClass()} font-arabic text-gray-800 dark:text-white mb-2`}>
+                  {parseArabicWithTajwid('بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ')}
                 </p>
                 <p className="text-gray-600 dark:text-gray-400">
                   Dengan nama Allah Yang Maha Pengasih, Maha Penyayang
@@ -178,6 +385,54 @@ const toggleBookmark = (ayat) => {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Tajwid Legend */}
+        <div className="max-w-4xl mx-auto mb-8">
+          <details className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border border-gray-200 dark:border-gray-700">
+            <summary className="cursor-pointer font-semibold text-gray-800 dark:text-white flex items-center justify-between">
+              <span>Keterangan Warna Tajwid</span>
+              <span className="text-xs text-gray-500">Klik untuk lihat</span>
+            </summary>
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-pink-600 rounded"></div>
+                <span className="text-gray-700 dark:text-gray-300">Ghunnah</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-green-600 rounded"></div>
+                <span className="text-gray-700 dark:text-gray-300">Qalqalah</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-purple-600 rounded"></div>
+                <span className="text-gray-700 dark:text-gray-300">Idgham</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-orange-600 rounded"></div>
+                <span className="text-gray-700 dark:text-gray-300">Iqlab</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-yellow-600 rounded"></div>
+                <span className="text-gray-700 dark:text-gray-300">Ikhfa</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-red-600 rounded"></div>
+                <span className="text-gray-700 dark:text-gray-300">Mad</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-blue-600 rounded"></div>
+                <span className="text-gray-700 dark:text-gray-300">Lam</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-indigo-600 rounded"></div>
+                <span className="text-gray-700 dark:text-gray-300">Ra Tafkhim</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-cyan-600 rounded"></div>
+                <span className="text-gray-700 dark:text-gray-300">Ra Tarqiq</span>
+              </div>
+            </div>
+          </details>
         </div>
 
         {/* Navigation */}
@@ -249,8 +504,8 @@ const toggleBookmark = (ayat) => {
 
               {/* Arabic Text */}
               <div className="mb-6">
-                <p className="text-right text-3xl leading-relaxed font-arabic text-gray-800 dark:text-white">
-                  {ayatItem.arab}
+                <p className={`text-right ${getFontSizeClass()} leading-relaxed font-arabic text-gray-800 dark:text-white`}>
+                  {parseArabicWithTajwid(ayatItem.arab)}
                 </p>
               </div>
 
@@ -260,8 +515,8 @@ const toggleBookmark = (ayat) => {
                   <h4 className="font-semibold text-gray-800 dark:text-white mb-2">
                     Terjemahan:
                   </h4>
-                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                    {ayatItem.tafsir}
+                  <p className={`${getTafsirFontSizeClass()} text-gray-700 dark:text-gray-300 leading-relaxed`}>
+                    {parseTextWithTajwid(ayatItem.tafsir)}
                   </p>
                 </div>
 
@@ -271,8 +526,8 @@ const toggleBookmark = (ayat) => {
                     <h4 className="font-semibold text-gray-800 dark:text-white mb-2">
                       Tafsir Muyassar:
                     </h4>
-                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                      {ayatItem.tafsir_muasir}
+                    <p className={`${getTafsirFontSizeClass()} text-gray-700 dark:text-gray-300 leading-relaxed`}>
+                      {parseTextWithTajwid(ayatItem.tafsir_muasir)}
                     </p>
                   </div>
                 )}
@@ -282,8 +537,8 @@ const toggleBookmark = (ayat) => {
                     <h4 className="font-semibold text-gray-800 dark:text-white mb-2">
                       Tafsir Clear Quran:
                     </h4>
-                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                      {ayatItem.tafsir_clearQuran}
+                    <p className={`${getTafsirFontSizeClass()} text-gray-700 dark:text-gray-300 leading-relaxed`}>
+                      {parseTextWithTajwid(ayatItem.tafsir_clearQuran)}
                     </p>
                   </div>
                 )}
@@ -293,8 +548,8 @@ const toggleBookmark = (ayat) => {
                     <h4 className="font-semibold text-gray-800 dark:text-white mb-2">
                       Tafsir Sure Quran:
                     </h4>
-                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                      {ayatItem.tafsir_sureQuran}
+                    <p className={`${getTafsirFontSizeClass()} text-gray-700 dark:text-gray-300 leading-relaxed`}>
+                      {parseTextWithTajwid(ayatItem.tafsir_sureQuran)}
                     </p>
                   </div>
                 )}
